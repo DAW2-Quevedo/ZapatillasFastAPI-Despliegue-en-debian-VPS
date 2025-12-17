@@ -1,5 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI,Depends,HTTPException
+from typing import AsyncContextManager
+from sqlmodel import Session,select
+
+from models.zapatilla import Zapatilla
+
+
 import uvicorn
+
 
 app = FastAPI()
 
