@@ -1,161 +1,113 @@
-# ZapatillasFastAPI
+# PRACTICA-EXAMEN Despliegue de Aplicaciones Web - CURSO DAW2
+Despliegue de FastAPI en VPS (Debian 13) con NGINX y HTTPS
+Esta practica-examen  asume que : 
 
-API REST para gestionar un catalogo de zapatillas.
+tienes funcionando en Docker tu aplicacion FastAPI (Zapatillas, por ejemplo)
+acceso al servidor via sFTP y un administrador del sistema como Jordi ;-) (risas)
+ ya tienes  tu código subido al servidor, un dominio (DNS)  y acceso  sudo.
 
-## Requisitos
+TIP: tienes funcionando en WSL  tu aplicacion FastAPI (Zapatillas, por ejemplo), antes de pasar de desarrollo a produccion (en nuestro servidor de pruebas ‘zzz’)
+1. Configurar el DNS (tarea a realizar por fenix)
+(Igual que tu versión original, esto es independiente del sistema operativo)
+En tu proveedor de dominios, crea un Registro A.
+Apunta ejemplo.com a la IP de tu VPS (ej: 123.123.123.123).
+(Opcional) Crea un CNAME para www apuntando a ejemplo.com.
 
-- Python 3.11+
-- MySQL 8.0+
+2. Actualizar el VPS (o tu Windows Subsytem for Linux)
+Prepara el sistema Debian en tu WSL:
 
-## Instalacion Local
 
-```bash
-# Clonar repositorio
-git clone <url-repo>
-cd ZapatillasFastAPI
-
-# Crear entorno virtual
-python3 -m venv venv
-source venv/bin/activate
-
-# Instalar dependencias
-pip install -r requirements.txt
-
-# Configurar variables de entorno
-cp .env.example .env
-# Editar .env con tus credenciales de MySQL
-
-# Ejecutar en desarrollo
-uvicorn src.main:app --reload
-```
-
-## Despliegue en Produccion (Debian/Ubuntu)
-
-### 1. Preparar el servidor
-
-```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install python3 python3-venv python3-pip nginx mysql-server -y
-```
+sudo apt install nginx 
 
-### 2. Configurar MySQL
+( Python viene pre-instalado por defecto, en Debian )
 
-```bash
-sudo mysql_secure_installation
 
-sudo mysql -u root -p
-```
+3. Python y Configurar la App
 
-```sql
-CREATE DATABASE zapatillas;
-CREATE USER 'zapatillas_user'@'localhost' IDENTIFIED BY 'tu_password_seguro';
-GRANT ALL PRIVILEGES ON zapatillas.* TO 'zapatillas_user'@'localhost';
-FLUSH PRIVILEGES;
-EXIT;
-```
+Crear el entorno virtual:
+Bash
+cd /ruta/a/tu/proyecto
+python3 -m venv env
+source env/bin/activate
 
-### 3. Configurar la aplicacion
 
-```bash
-cd /var/www
-sudo git clone <url-repo> zapatillas
-cd zapatillas
-
-sudo python3 -m venv venv
-source venv/bin/activate
+Instalar librerías Python:
+Asegúrate de que tu requirements.txt incluya fastapi, uvicorn y gunicorn. Si no, instálalos:
+Bash
 pip install -r requirements.txt
-pip install gunicorn
+pip install gunicorn uvicorn
 
-# Configurar .env
-sudo nano .env
-```
 
-### 4. Crear servicio systemd
-
-```bash
+Configurar Gunicorn (Systemd Service):
+Creamos un servicio para que la app arranque sola y se reinicie si falla.
+Bash
 sudo nano /etc/systemd/system/zapatillas.service
-```
 
-```ini
+Contenido corregido:
+Se añade -k uvicorn.workers.UvicornWorker (Vital para FastAPI).
+Se cambia el bind a 127.0.0.1 (Por seguridad, para que no sea accesible desde fuera sin pasar por NGINX).
+Ini, TOML
 [Unit]
-Description=Zapatillas FastAPI
+Description=Gunicorn instance to serve ZapatillasFastAPI
 After=network.target
 
 [Service]
-User=www-data
+User=tu_usuario
 Group=www-data
-WorkingDirectory=/var/www/zapatillas
-Environment="PATH=/var/www/zapatillas/venv/bin"
-ExecStart=/var/www/zapatillas/venv/bin/gunicorn -k uvicorn.workers.UvicornWorker -w 4 -b 127.0.0.1:8000 src.main:app
+WorkingDirectory=/ruta/a/tu/proyecto
+Environment="PATH=/ruta/a/tu/proyecto/env/bin"
+# OJO: Cambia 'app:app' por 'nombre_archivo:nombre_instancia_fastapi'
+ExecStart=/ruta/a/tu/proyecto/env/bin/gunicorn -k uvicorn.workers.UvicornWorker --workers 4 --bind 127.0.0.1:8000 app:app
 
 [Install]
 WantedBy=multi-user.target
-```
 
-```bash
+
+Arrancar la aplicación:
+Bash
 sudo systemctl daemon-reload
 sudo systemctl start zapatillas
 sudo systemctl enable zapatillas
-```
 
-### 5. Configurar NGINX
 
-```bash
+4. Configurar NGINX (Fase HTTP)
+Primero configuramos NGINX solo para HTTP (Puerto ¿XY?). 
+
+Configurar el servidor Web NGINX:
+
+
+
+Crear archivo de configuración:
+Bash
 sudo nano /etc/nginx/sites-available/zapatillas
-```
 
-```nginx
+Contenido inicial:
+Nginx
 server {
-    listen 80;
-    server_name tu-dominio.com;
+    listen ¿XY?;
+    server_name ¿ejemplo.com? ¿www.ejemplo.com?;
 
     location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+        proxy_pass … ¿?    }
 }
-```
-
-```bash
-sudo ln -s /etc/nginx/sites-available/zapatillas /etc/nginx/sites-enabled/
+Te has preguntado, en la configuracion de Nginx, … ¿Que directivas proxy son necesarias ?
+Activar el sitio y verificar:
+Bash
+sudo ln -s /etc/nginx/sites-available/zapatillas /etc/nginx/sites-enabled
+# Verificar que la sintaxis es correcta
 sudo nginx -t
+# Reiniciar
 sudo systemctl restart nginx
-```
 
-### 6. SSL con Certbot (opcional)
+En este punto, tu web ya debería funcionar por http://ejemplo.com.
 
-```bash
-sudo apt install certbot python3-certbot-nginx -y
-sudo certbot --nginx -d tu-dominio.com
-```
 
-## Endpoints
+4. Configurar NGINX (Fase HTTP)
 
-| Metodo | Ruta | Descripcion |
-|--------|------|-------------|
-| GET | /zapatillas | Lista todas |
-| POST | /zapatillas | Crear nueva |
-| GET | /zapatillas/{id} | Obtener por ID |
-| PATCH | /zapatillas/{id} | Actualizar |
-| DELETE | /zapatillas/{id} | Eliminar |
-| GET | /docs | Swagger UI |
-| GET | /redoc | ReDoc |
+En este punto, tu web ya debería funcionar por https://ejemplo.com.
 
-## Estructura
+NOTAS:
+Dependencias: Se añadió python3-venv (necesario en Debian).
+Gunicorn: Se configura el worker uvicorn (necesario para FastAPI)
 
-```
-.
-├── src/
-│   ├── main.py              # Aplicacion FastAPI
-│   ├── models/              # Modelos SQLModel
-│   ├── data/                # Repositorio y DB
-│   ├── routers/             # Endpoints API
-│   ├── templates/           # Plantillas Jinja2
-│   └── static/              # Archivos estaticos
-├── requirements.txt
-├── .env
-└── README.md
-```

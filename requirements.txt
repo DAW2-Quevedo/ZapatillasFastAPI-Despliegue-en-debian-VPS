@@ -1,6 +1,5 @@
 fastapi
 uvicorn
-gunicorn
 sqlmodel
 pymysql
 cryptography
