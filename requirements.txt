@@ -2,8 +2,5 @@ fastapi
 uvicorn
 gunicorn
 sqlmodel
-pymysql
-cryptography
 jinja2
 python-multipart
-python-dotenv

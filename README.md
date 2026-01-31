@@ -5,7 +5,6 @@ API REST para gestionar un catalogo de zapatillas.
 ## Requisitos
 
 - Python 3.11+
-- MySQL 8.0+
 
 ## Instalacion Local
 
@@ -21,13 +20,11 @@ source venv/bin/activate
 # Instalar dependencias
 pip install -r requirements.txt
 
-# Configurar variables de entorno
-cp .env.example .env
-# Editar .env con tus credenciales de MySQL
-
-# Ejecutar en desarrollo
+# Ejecutar
 uvicorn src.main:app --reload
 ```
+
+La base de datos SQLite se crea automaticamente en `zapatillas.db`.
 
 ## Despliegue en Produccion (Debian/Ubuntu)
 
@@ -35,26 +32,10 @@ uvicorn src.main:app --reload
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install python3 python3-venv python3-pip nginx mysql-server -y
+sudo apt install python3 python3-venv python3-pip nginx -y
 ```
 
-### 2. Configurar MySQL
-
-```bash
-sudo mysql_secure_installation
-
-sudo mysql -u root -p
-```
-
-```sql
-CREATE DATABASE zapatillas;
-CREATE USER 'zapatillas_user'@'localhost' IDENTIFIED BY 'tu_password_seguro';
-GRANT ALL PRIVILEGES ON zapatillas.* TO 'zapatillas_user'@'localhost';
-FLUSH PRIVILEGES;
-EXIT;
-```
-
-### 3. Configurar la aplicacion
+### 2. Configurar la aplicacion
 
 ```bash
 cd /var/www
@@ -64,13 +45,9 @@ cd zapatillas
 sudo python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-pip install gunicorn
-
-# Configurar .env
-sudo nano .env
 ```
 
-### 4. Crear servicio systemd
+### 3. Crear servicio systemd
 
 ```bash
 sudo nano /etc/systemd/system/zapatillas.service
@@ -93,12 +70,13 @@ WantedBy=multi-user.target
 ```
 
 ```bash
+sudo chown -R www-data:www-data /var/www/zapatillas
 sudo systemctl daemon-reload
 sudo systemctl start zapatillas
 sudo systemctl enable zapatillas
 ```
 
-### 5. Configurar NGINX
+### 4. Configurar NGINX
 
 ```bash
 sudo nano /etc/nginx/sites-available/zapatillas
@@ -125,7 +103,7 @@ sudo nginx -t
 sudo systemctl restart nginx
 ```
 
-### 6. SSL con Certbot (opcional)
+### 5. SSL con Certbot (opcional)
 
 ```bash
 sudo apt install certbot python3-certbot-nginx -y
@@ -156,6 +134,35 @@ sudo certbot --nginx -d tu-dominio.com
 │   ├── templates/           # Plantillas Jinja2
 │   └── static/              # Archivos estaticos
 ├── requirements.txt
-├── .env
+├── zapatillas.db            # Base de datos SQLite (auto-generada)
 └── README.md
 ```
+
+---
+
+## Propuestas de Mejora KISS
+
+### Aplicadas en esta version
+
+| Antes | Ahora | Beneficio |
+|-------|-------|-----------|
+| MySQL (servidor externo) | SQLite (archivo local) | Zero configuracion, sin dependencias externas |
+| 9 dependencias | 6 dependencias | Menos superficie de ataque, instalacion mas rapida |
+| .env con 5 variables | .env con 1 variable (opcional) | Configuracion minima |
+| Requiere instalar MySQL | Solo Python | Despliegue inmediato |
+
+### Futuras mejoras posibles
+
+1. **Eliminar Jinja2/templates** si solo se usa como API REST pura
+2. **Eliminar python-multipart** si no se necesitan uploads de archivos
+3. **Un solo archivo** - consolidar todo en `main.py` para proyectos pequenos
+4. **Usar SQLite en memoria** para testing: `DATABASE_PATH=:memory:`
+5. **Eliminar routers/** si hay pocos endpoints - definirlos directamente en main.py
+
+### Principios KISS aplicados
+
+- **Sin Docker**: Python + venv es suficiente
+- **Sin MySQL**: SQLite viene incluido en Python
+- **Sin .env obligatorio**: valores por defecto sensatos
+- **Sin configuracion**: funciona al instalar dependencias
+- **Datos de ejemplo**: la app arranca lista para probar
